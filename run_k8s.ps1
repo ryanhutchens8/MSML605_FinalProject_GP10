@@ -1,3 +1,4 @@
+Set-Location $PSScriptRoot
 $namespace = "load-forecast"
 $image = "load-forecast-api:v18"
 
