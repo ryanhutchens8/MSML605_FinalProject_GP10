@@ -32,6 +32,10 @@ cd "<project-folder>"
 Then run:
 
 ```powershell
+docker build -t load-forecast-api:v18 .
+```
+To create the initial image followed by:
+```powershell
 .\run_k8s.ps1
 ```
 
