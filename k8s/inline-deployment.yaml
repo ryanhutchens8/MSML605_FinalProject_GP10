@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-forecast-inline
+  namespace: load-forecast
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-forecast-inline
+  template:
+    metadata:
+      labels:
+        app: load-forecast-inline
+    spec:
+      containers:
+        - name: api
+          image: load-forecast-api:v18
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          env:
+            - name: MODE
+              value: "inline"

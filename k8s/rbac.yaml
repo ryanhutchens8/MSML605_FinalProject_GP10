@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: drift-monitor-sa
+  namespace: load-forecast
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: drift-monitor-role
+  namespace: load-forecast
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: drift-monitor-rolebinding
+  namespace: load-forecast
+subjects:
+  - kind: ServiceAccount
+    name: drift-monitor-sa
+    namespace: load-forecast
+roleRef:
+  kind: Role
+  name: drift-monitor-role
+  apiGroup: rbac.authorization.k8s.io

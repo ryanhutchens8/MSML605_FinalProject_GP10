@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-forecast-static
+  namespace: load-forecast
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: load-forecast-static
+  template:
+    metadata:
+      labels:
+        app: load-forecast-static
+    spec:
+      containers:
+        - name: api
+          image: load-forecast-api:v18
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MODE
+              value: "static"

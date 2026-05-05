@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: static-service
+  namespace: load-forecast
+spec:
+  selector:
+    app: load-forecast-static
+  ports:
+    - port: 8000
+      targetPort: 8000

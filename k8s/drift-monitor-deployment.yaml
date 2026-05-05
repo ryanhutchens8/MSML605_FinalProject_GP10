@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drift-monitor
+  namespace: load-forecast
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: drift-monitor
+  template:
+    metadata:
+      labels:
+        app: drift-monitor
+    spec:
+      serviceAccountName: drift-monitor-sa
+      containers:
+        - name: drift-monitor
+          image: load-forecast-api:v18
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "app.drift_monitor"]
+          env:
+            - name: DYNAMIC_API_URL
+              value: "http://dynamic-service:8000"
+            - name: PROMETHEUS_URL
+              value: "http://prometheus-service:9090"
+            - name: DRIFT_THRESHOLD_MW
+              value: "2000"
+            - name: COOLDOWN_HOURS
+              value: "336"
+            - name: POLL_INTERVAL_SEC
+              value: "10"
+            - name: NAMESPACE
+              value: "load-forecast"
+            - name: JOB_IMAGE
+              value: "load-forecast-api:v18"
+            - name: RETRAINED_MODELS_DIR
+              value: "/app/retrained-models"

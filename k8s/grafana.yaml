@@ -1,0 +1,988 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource
+  namespace: load-forecast
+data:
+  datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        uid: prometheus
+        url: http://prometheus-service:9090
+        access: proxy
+        isDefault: true
+        editable: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: load-forecast
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: default
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard
+  namespace: load-forecast
+data:
+  load-forecast.json: |
+    {
+      "title": "Load Forecast MLOps Monitor",
+      "uid": "load-forecast",
+      "schemaVersion": 38,
+      "version": 3,
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "timezone": "browser",
+      "graphTooltip": 1,
+      "tags": ["load-forecast", "mlops"],
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          },
+          {
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "enable": true,
+            "expr": "increase(retrain_started_total{job=\"load-forecast-dynamic\"}[20s]) > 0",
+            "iconColor": "#73BF69",
+            "name": "Dynamic Retrain Started",
+            "titleFormat": "Dynamic retrain started",
+            "textFormat": "Job started",
+            "type": "dashboard"
+          },
+          {
+            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "enable": true,
+            "expr": "increase(retrain_started_total{job=\"load-forecast-inline\"}[20s]) > 0",
+            "iconColor": "#FF9830",
+            "name": "Inline Retrain Started",
+            "titleFormat": "Inline retrain started",
+            "textFormat": "Inline training in API pod",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Dynamic Drift Status",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "OK", "color": "green" },
+                    "1": { "text": "DRIFT", "color": "red" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "drift_active{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Drift",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Dynamic Retrains Completed",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "retrain_count_total{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Retrains",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Dynamic Model Loaded",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "Base", "color": "blue" },
+                    "1": { "text": "Retrained", "color": "green" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "model_retrained_active{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Model",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Dynamic Rolling MAE",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1500 },
+                  { "color": "red", "value": 2000 }
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "rolling_mae_mw{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "MAE",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Inline Drift Status",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "OK", "color": "green" },
+                    "1": { "text": "DRIFT", "color": "red" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "drift_active{job=\"load-forecast-inline\"}",
+              "legendFormat": "Drift",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Inline Retrains Completed",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "retrain_count_total{job=\"load-forecast-inline\"}",
+              "legendFormat": "Retrains",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Inline Model Loaded",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": { "text": "Base", "color": "blue" },
+                    "1": { "text": "Retrained", "color": "green" }
+                  }
+                }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "model_retrained_active{job=\"load-forecast-inline\"}",
+              "legendFormat": "Model",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 42,
+          "title": "Inline Rolling MAE",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 1500 },
+                  { "color": "red", "value": 2000 }
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "rolling_mae_mw{job=\"load-forecast-inline\"}",
+              "legendFormat": "MAE",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Static Model: Actual vs Evaluated Prediction",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Predicted.*" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [6, 4], "fill": "dash" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "latest_actual_mw{job=\"load-forecast-static\"}",
+              "legendFormat": "Static Actual MW",
+              "refId": "A"
+            },
+            {
+              "expr": "evaluated_prediction_mw{job=\"load-forecast-static\"}",
+              "legendFormat": "Static Predicted MW",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Dynamic Model: Actual vs Evaluated Prediction",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Predicted.*" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [6, 4], "fill": "dash" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "latest_actual_mw{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Dynamic Actual MW",
+              "refId": "A"
+            },
+            {
+              "expr": "evaluated_prediction_mw{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Dynamic Predicted MW",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "title": "Inline Model: Actual vs Evaluated Prediction",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Predicted.*" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [6, 4], "fill": "dash" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "latest_actual_mw{job=\"load-forecast-inline\"}",
+              "legendFormat": "Inline Actual MW",
+              "refId": "A"
+            },
+            {
+              "expr": "evaluated_prediction_mw{job=\"load-forecast-inline\"}",
+              "legendFormat": "Inline Predicted MW",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 20,
+          "title": "Rolling MAE vs Drift Threshold",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Drift Threshold" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [8, 4], "fill": "dash" } },
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rolling_mae_mw{job=\"load-forecast-static\"}",
+              "legendFormat": "Static MAE",
+              "refId": "A"
+            },
+            {
+              "expr": "rolling_mae_mw{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Dynamic MAE",
+              "refId": "B"
+            },
+            {
+              "expr": "rolling_mae_mw{job=\"load-forecast-inline\"}",
+              "legendFormat": "Inline MAE",
+              "refId": "C"
+            },
+            {
+              "expr": "vector(2000)",
+              "legendFormat": "Drift Threshold",
+              "refId": "D"
+            }
+          ]
+        },
+        {
+          "id": 21,
+          "title": "Latest Point Error",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "prediction_error_mw{job=\"load-forecast-static\"}",
+              "legendFormat": "Static Error",
+              "refId": "A"
+            },
+            {
+              "expr": "prediction_error_mw{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Dynamic Error",
+              "refId": "B"
+            },
+            {
+              "expr": "prediction_error_mw{job=\"load-forecast-inline\"}",
+              "legendFormat": "Inline Error",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 30,
+          "title": "Prediction Latency p95",
+          "type": "timeseries",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(prediction_duration_seconds_bucket{job=\"load-forecast-static\"}[1m])))",
+              "legendFormat": "Static p95",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(prediction_duration_seconds_bucket{job=\"load-forecast-dynamic\"}[1m])))",
+              "legendFormat": "Dynamic p95",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(prediction_duration_seconds_bucket{job=\"load-forecast-inline\"}[1m])))",
+              "legendFormat": "Inline p95",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 31,
+          "title": "API CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "none"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rate(process_cpu_seconds_total{job=\"load-forecast-static\"}[1m])",
+              "legendFormat": "Static CPU cores",
+              "refId": "A"
+            },
+            {
+              "expr": "rate(process_cpu_seconds_total{job=\"load-forecast-dynamic\"}[1m])",
+              "legendFormat": "Dynamic CPU cores",
+              "refId": "B"
+            },
+            {
+              "expr": "rate(process_cpu_seconds_total{job=\"load-forecast-inline\"}[1m])",
+              "legendFormat": "Inline CPU cores",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 32,
+          "title": "API Memory Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "bytes"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "process_resident_memory_bytes{job=\"load-forecast-static\"}",
+              "legendFormat": "Static RSS",
+              "refId": "A"
+            },
+            {
+              "expr": "process_resident_memory_bytes{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Dynamic RSS",
+              "refId": "B"
+            },
+            {
+              "expr": "process_resident_memory_bytes{job=\"load-forecast-inline\"}",
+              "legendFormat": "Inline RSS",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 40,
+          "title": "Latest 6-Hour Forecast",
+          "type": "timeseries",
+          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 31 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "short"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Forecast.*" },
+                "properties": [
+                  { "id": "custom.lineStyle", "value": { "dash": [6, 4], "fill": "dash" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "forecast_mw_6h{job=\"load-forecast-static\"}",
+              "legendFormat": "Static Forecast",
+              "refId": "A"
+            },
+            {
+              "expr": "forecast_mw_6h{job=\"load-forecast-dynamic\"}",
+              "legendFormat": "Dynamic Forecast",
+              "refId": "B"
+            },
+            {
+              "expr": "forecast_mw_6h{job=\"load-forecast-inline\"}",
+              "legendFormat": "Inline Forecast",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "id": 41,
+          "title": "Prediction Throughput",
+          "type": "timeseries",
+          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 31 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "lineWidth": 2 },
+              "unit": "reqps"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Static.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#F2CC0C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Dynamic.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byRegexp", "options": ".*Inline.*" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rate(prediction_requests_total{job=\"load-forecast-static\"}[1m])",
+              "legendFormat": "Static req/s",
+              "refId": "A"
+            },
+            {
+              "expr": "rate(prediction_requests_total{job=\"load-forecast-dynamic\"}[1m])",
+              "legendFormat": "Dynamic req/s",
+              "refId": "B"
+            },
+            {
+              "expr": "rate(prediction_requests_total{job=\"load-forecast-inline\"}[1m])",
+              "legendFormat": "Inline req/s",
+              "refId": "C"
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: load-forecast
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.2.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Admin"
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: "false"
+          volumeMounts:
+            - name: datasource
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-json
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: datasource
+          configMap:
+            name: grafana-datasource
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboard-json
+          configMap:
+            name: grafana-dashboard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: load-forecast
+spec:
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
