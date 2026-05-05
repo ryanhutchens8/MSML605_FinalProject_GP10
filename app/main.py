@@ -30,12 +30,14 @@ async def lifespan(app: FastAPI):
     global USE_RETRAINED
 
     from app.features import FEATURE_COLUMNS
-    from app.model import model as _model, scaler_x as _scaler_x, scaler_y as _scaler_y
+    
 
     USE_RETRAINED = MODE == "dynamic" and retrained_files_available()
     load_model(use_retrained=USE_RETRAINED)
     MODEL_RETRAINED_ACTIVE.labels(mode=MODE).set(1 if USE_RETRAINED else 0)
-
+    
+    from app.model import model as _model, scaler_x as _scaler_x, scaler_y as _scaler_y
+    
     warmup_input = np.zeros((1, len(FEATURE_COLUMNS)))
     warmup_scaled = _scaler_x.transform(warmup_input)
     _scaler_y.inverse_transform(_model.predict(warmup_scaled).reshape(-1, 1))
